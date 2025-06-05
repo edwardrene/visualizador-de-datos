@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import escudoLogo from "./assets/escudo.png";
 import { Line, Bar, Pie } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -66,6 +67,16 @@ function UploadAndChart() {
   const [contieneX, setContieneX] = useState("");
   const [contieneY, setContieneY] = useState("");
   const [error, setError] = useState(null);
+  const chartRef = useRef(null);
+
+    useEffect(() => {
+    // Limpiar gráfico anterior cuando cambie el tipo de gráfico
+    return () => {
+      if (chartRef.current) {
+        chartRef.current = null;
+      }
+    };
+  }, [activeChart, xColumn, yColumn]);
 
   // Limpiar y cargar datos al cambiar de área
   useEffect(() => {
@@ -441,45 +452,93 @@ const handleResetFilters = (areaId) => {
   const pieOptions = { responsive: true, plugins: { legend: { position: "top" } } };
 
   // Renderizar gráfico según área y tipo
-  const renderChart = () => {
-    let data;
-    switch (activeArea) {
-      case "compras":
-        data = almacenData;
-        break;
-      case "recursos":
-        data = recursosData;
-        break;
-      case "apoyo":
-        data = apoyoData;
-        break;
-      case "gimnasio":
-        data = gimnasioData;
-        break;
-      default:
-        return null;
-    }
-    if (!data) return null;
-    return (
-      <>
-        {data.lineChartData && activeChart === "line" && (
-          <div className="chart-container mb-6" style={{ position: 'relative', height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-            <Line options={lineOptions} data={data.lineChartData} />
-          </div>
-        )}
-        {data.barChartData && activeChart === "bar" && (
-          <div className="chart-container mb-6" style={{ position: 'relative', height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-            <Bar options={barOptions} data={data.barChartData} />
-          </div>
-        )}
-        {data.pieChartData && activeChart === "pie" && (
-          <div className="chart-container mb-6" style={{ position: 'relative', height: '400px', width: '600px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Pie options={pieOptions} data={data.pieChartData} />
-          </div>
-        )}
-      </>
-    );
+const renderChart = () => {
+
+  if (activeChart === 'table') {
+    return renderTable();
+  }
+
+  let areaData;
+  switch (activeArea) {
+    case "compras":
+      areaData = almacenData;
+      break;
+    case "recursos":
+      areaData = recursosData;
+      break;
+    case "apoyo":
+      areaData = apoyoData;
+      break;
+    case "gimnasio":
+      areaData = gimnasioData;
+      break;
+    default:
+      return null;
+  }
+
+  if (!areaData?.tableData?.data || !xColumn || !yColumn) return null;
+
+  const data = areaData.tableData.data;
+  
+  // Preparar datos según el tipo de gráfico
+  const chartData = {
+    labels: data.map(row => row[xColumn]),
+    datasets: [{
+      label: yColumn,
+      data: data.map(row => row[yColumn]),
+      borderColor: 'rgb(75, 192, 192)',
+      backgroundColor: activeChart === 'pie' ?
+        data.map(() => `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.5)`) :
+        'rgba(75, 192, 192, 0.2)',
+    }]
   };
+
+  // Configuraciones específicas para cada tipo de gráfico
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: activeChart === 'pie' ? 'right' : 'top',
+      },
+      title: {
+        display: true,
+        text: `${yColumn} vs ${xColumn}`
+      }
+    },
+    scales: activeChart === 'pie' ? undefined : {
+      y: {
+        beginAtZero: true,
+      }
+    }
+  };
+
+  // Renderizar el gráfico según el tipo seleccionado
+  switch (activeChart) {
+    case 'line':
+      return (
+        <div className="chart-container mb-6" style={{ position: 'relative', height: '400px', width: '100%' }}>
+          <Line data={chartData} options={commonOptions} />
+        </div>
+      );
+    case 'bar':
+      return (
+        <div className="chart-container mb-6" style={{ position: 'relative', height: '400px', width: '100%' }}>
+          <Bar data={chartData} options={commonOptions} />
+        </div>
+      );
+    case 'pie':
+      return (
+        <div className="chart-container mb-6" style={{ position: 'relative', height: '400px', width: '100%' }}>
+          <Pie data={chartData} options={commonOptions} />
+        </div>
+      );
+    case 'table':
+      return renderTable();
+    default:
+      return null;
+  }
+};
 
   return (
     <div className="flex h-screen">
@@ -519,7 +578,7 @@ const handleResetFilters = (areaId) => {
       <main className="flex-1 p-6 overflow-y-auto">
         <header className="flex justify-between items-center mb-4 bg-green-500 p-4 rounded">
           <img
-            src="images/IMAGOTIPO HORIZONTAL BLANCO.png"
+            src={escudoLogo}
             alt="Logo UdeC"
             className="h-12"
           />
@@ -684,9 +743,6 @@ const handleResetFilters = (areaId) => {
         >
           <div>
             {renderChart()}
-          </div>
-          <div className="mt-6">
-            {renderTable()}
           </div>
         </section>
       </main>
